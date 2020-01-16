@@ -1,0 +1,1757 @@
+---
+title: "Herramienta para analizar matrices de expresión génicas con machine learning"
+author: "DOMINGO JAVIER RODRÍGUEZ PÉREZ"
+date: "18 de noviembre de 2019"
+output: word_document
+toc: yes
+---
+```{r librerias, include=FALSE}
+
+rm(list=ls())
+
+library(GEOquery)
+library(ArrayExpress)
+library(affy)
+library(ggplot2)
+library(reshape2)
+library(edgeR)
+library(Biobase)
+library(GEOquery)
+library(limma)
+library(pander)
+library(reshape2)
+library(ggplot2)
+library(caret)
+library(randomForest)
+library(caTools)
+library(dplyr)
+library(ROCR)
+library(plotROC)
+library(pROC)
+library(ggpubr)
+library(cvAUC)
+library(Boruta)
+
+library(tidyverse)
+library(lubridate)
+library(scales)
+library(Cairo)
+library(readODS)
+```
+# Identificación del trabajo
+
+## Resumen
+
+## Objetivo
+
+Herramienta para analizar matrices de expresión, tanto RNA-seq como microarrays y hacer clasificaciones basadas en la expresión.
+
+Como ejemplo se analizarán matrices de expresión de aislados de plaquetas de pacientes con cancer de pulmón, y otros sin cáncer conocido, con el fin de identificar o predecir ésta indeseable condición frente a no solo sanos sino tambien otros pacientes con enfermedades inflamatorias a priori mas complicadas de clasificar.
+
+
+**Antecedentes**
+
+Ya se han hecho algunas publicaciones donde se predice el cáncer de pulmónn con la información contenida en las plaquetas, si embargo, es una técnica reciente y aún son pocos los estudios,sin embargo la cantidad de datos de este tipo va en aumento por lo que es necesario una herramienta eficaz que los analice.
+
+En este ejemplo analizaré los datos del estudio: *Swarm Intelligence-Enhanced Detection of Non-Small-Cell Lung Cancer Using Tumor-Educated Platelets* Autores: Myron G. Best, Thomas Wurdinger, ...
+
+Portada del articulo en figura 1.
+
+![](foto_art_Wurdi.png){width=100%}
+
+Otro ejemplo sobre experimentos de este tipo de datos es: **Applying Feature Selection to Improve Predictive Performance and Explainability in Lung Cancer Detection with Soft Computing** Autores:Nicolas Potie,Stavros Giannoukakos,Michael Hackenberg,Alberto Fernandez.
+
+
+## Listado de objetivos
+
+1.-Proporcionar una manera sencilla de **acceder** a los datos de matrices de expresión contenidos en el repositorio NCBI Geo, **y estructurar los datos** para obtener tablas y gráficos que resuman el experimento y la expresión de los diferentes grupos de pacientes.
+
+2.-Proporcionar una manera sencilla de construir el **diseño experimental** con un análisis explicativo de la causalidad entre la expresión y las condiciones del paciente (ejemplo: la condición de cáncer).
+
+2.1.- Control interno y **transformaciones de los datos** si es necesario (normalización, ruido de fondo,... )
+
+2.2.- Facilitar la exploración de las anotaciones de cada muestra para **crear los grupos de interés.**
+
+2.3.-Control externo con la **generación de gráficos** de la expresión de genes entre grupos.
+
+2.3.- Selección de **genes relevantes.**
+
+3.- Predicción mediante **machine learning**
+
+3.1.- Implementación de validación cruzada (Cross Validation)
+
+3.2.- Implementación de aprendizaje automatico Random forest
+
+3.2.1- Comprobación del rendimiento
+
+3.3.- Majera del rendimiento Feature selection)
+
+3.3.- Comprobación del rendimiento
+
+3.4.- Comprobación del rendimiento por grupos de pacientes.
+
+4.- Genes relevantes en la clasificación y predicción.
+
+
+##  Enfoque y método seguido
+
+Desarrollar una herramienta en Rstudio que analice matrices de expresión (RNA_seq y/o microarrays), que haga contrastes entre condiciones (ejemplo: cáncer-no cáncer, cáncer de pulmón-otros tipos de cáncer...) y que devuelva los genes mas relevantes que expliquen esa condición.
+
+
+
+#  Planificación del Trabajo
+
+		
+
+## Recursos necesarios para realizar el trabajo
+
+El proyecto se realizará en Rstudio
+
+Es necesario un Pc personal con conexión al repositorio de datos de matrices de expresión NCBI GEO
+
+
+## Tareas a realizar
+
+Recopilación de datos.- es necesaria la mayor cantidad possible
+
+Selección de atributo clasificador.- (grupos de cáncer)
+
+Análisis de datos en crudo.- descripción de datos (tipos, grupos...)
+
+Transformaciones de los datos.- De formato u estadisticos (eliminar ruido de fondo, normalización...)
+
+Análisis de datos transformados.- hist, boxplot...
+
+Contrastes de hipotesis.- (ejemplo: cáncer-nocancer, cáncer de pulmón- otros tipod de cáncer...)
+
+Selección de datos (genes) antes de machine learning.- cutoff en la diferencia de expresión
+
+Implementación de validación cruzada.
+
+Algoritmo machine learning random forest
+
+Feature selectión con diferentes número de genes escogidos por su diferencia de expresión mediante paquete edgeR.
+
+Comprobacion del rendimiento con diferentes número de genes según clasificación diferencial con paquete edgeR
+
+Feature selectión según el accuracy de los genes en la clasificación.
+
+Algoritmo machine learning con diferente número de genes según accuracy.
+
+Comprobación del rendimiento con diferentes número de genes escogidos por su accuracy en la clasificación
+
+Comprobación del rendimiento en los diferentes grupos de pacientes (si hay mas de 2)
+
+Tabla informativa de genes mas relevantes y que mejor explican la condición o contraste.
+
+
+## Productos obtenidos
+
+Input datos, facilitar la descarga de los datos mediante su código en GEO.
+
+Tabla informativa de los datos (título del experimento, tipos de datos...)
+
+Input atributo o condición clasificador para facilitar el contraste (ejemplo: cáncer-control)
+
+Gráficos informativos de la distribución de los datos (Diagrama de cajas e histograma)
+
+Gráficos de diferencias de expresión entre grupos (plotSmear y volcano)
+
+Input del número de genes diferecialmente expresados para el posterior entrenamiento (feature selectión según paquete edger)
+
+Gáficos y tablas para la evaluación del rendimiento en la clasificación mediante aprendizaje automatico ( matriz de confusión, curva ROC, AUC) con diferente múmeros de genes seleccionaos mediante el paquete edgeR
+
+Input del número de genes con mayor importancia en la clasificación  para el posterior entrenamiento (feature selectión según accuracy)
+
+Gáficos y tablas para la evaluación del rendimiento en la clasificación mediante aprendizaje automatico ( matriz de confusión, curva ROC, AUC) con diferente múmeros de genes seleccionaos mediante la importancia de los genes en la clasificación.
+
+Tabla informativa de los genes mas relevantes en la clasificación.
+
+
+## Diagrama de Gantt
+
+
+
+```{r }
+gantt <- read.ods("gantt.ods")
+gantt<-data.frame(gantt[1])
+colnames(gantt)<-gantt[1,]
+gantt<-gantt[-1,]
+tasks <-gantt[,1:4]
+```
+
+```{r include=FALSE}
+# Convert data to long for ggplot
+tasks.long <- tasks %>%
+  mutate(Start = ymd(Start),
+         End = ymd(End)) %>%
+  gather(date.type, task.date, -c(Project, Task)) %>%
+  arrange(date.type, task.date) %>%
+  mutate(Task = factor(Task, levels=rev(unique(Task)), ordered=TRUE))
+```
+
+
+```{r }
+x.breaks <- seq(length(tasks$Task) + 0.5 - 3, 0, by=-3)
+
+# Build plot
+ggplot(tasks.long, aes(x=Task, y=task.date, colour=Project)) + 
+    geom_line(size=6) + 
+    geom_vline(xintercept=x.breaks, colour="grey80", linetype="dotted") + 
+    guides(colour=guide_legend(title=NULL)) +
+    labs(x=NULL, y=NULL) + coord_flip() +
+    scale_y_date(date_breaks="1 months", labels=date_format("%b '%y")) + 
+    theme(axis.text.x=element_text(angle=45, hjust=1))
+```
+
+
+# Descripción del avance del proyecto 
+
+
+# Vincular con el repositorio NCBI
+
+La función getGEOSuppFiles() utiliza como parametro de entrada el código identificativo Gene Expression  Omnibus(GEO, http://www.ncbi.nlm.nih.gov/geo/) del RNAseq o mivroarray y devuelve los archivos disponibles en el repositorio NCBI
+
+```{r input gse, include=FALSE}
+geo.accession <- 'GSE89843' 
+```
+
+```{r directorios, include=FALSE}
+
+workingDir <- getwd()
+if(!dir.exists("data")) dir.create("data")
+dataDir <-file.path(workingDir, "data")
+if(!dir.exists("results")) dir.create("results")
+resultsDir <- file.path(workingDir,"results")
+if(!dir.exists("celfiles")) dir.create("celfiles")
+celfilesDir <- file.path(workingDir,"celfiles")
+```
+
+```{r, include=FALSE}
+# ver las carpetas disponibles para bajar 
+filePathss = getGEOSuppFiles(geo.accession, makeDirectory = FALSE, baseDir = dataDir, fetch_files=FALSE)
+print(filePathss$fname)
+```
+```{r, include=FALSE}
+archivo<-as.integer(2)
+print(filePathss$fname[archivo])
+```
+
+# Recopilación y exploración de los datos
+```{r, include=FALSE}
+filePaths<-paste(dataDir, geo.accession,filePathss$fname[archivo],sep = "/")
+print(filePaths)
+```
+
+
+## Cargar matriz de expresión génica
+
+Las matrices de expresion génica RNAseq constan de una serie de muestras como columnas y una gran serie de genes dispuestas en filas y en cada celda se almacena el nivel de expresión génica.
+
+```{r, include=FALSE}
+if (!file.exists(filePaths)){
+    getGEOSuppFiles(geo.accession, makeDirectory = TRUE, baseDir = dataDir, filter_regex = numero)
+}
+```
+
+```{r, include=FALSE}
+gse <- 
+  read.table(filePaths, header=TRUE, sep="", na.strings="NA", dec=".", strip.white=TRUE)
+```
+
+
+## Cargar tabla de anotaciones del RNA seq
+
+La tabla de anotaciones es un archivo con información sobre el experimento donde se obtubvo la matriz de expresión, es muy extenso, donde se puede destacar el diseño del experimento, los grupos en los que se distribuyen las muestras asi como el titúlo y autores del experimento.
+
+
+
+
+```{r, include=FALSE}
+filePaths<-paste(dataDir, geo.accession,sep = "/")
+print(filePaths)
+
+```
+
+```{r, include=FALSE}
+
+archivogset<- paste("gset",geo.accession, sep = ".")
+
+if (! file.exists(filePaths) ){
+    dir.create(filePaths, showWarnings = FALSE, recursive = FALSE, mode = "0777")
+    Sys.chmod(filePaths, mode = "0777", use_umask=TRUE)
+    
+    gset <- getGEO(geo.accession, destdir = filePaths, GSEMatrix =TRUE)
+    archivogset<- paste("gset",geo.accession, sep = ".")
+    save(gset, file = paste(filePaths,archivogset, sep = "/"))
+         
+} else{
+  setwd(filePaths)
+  load(archivogset,  verbose = FALSE)
+      #load(file = paste(filePaths,archivogset, sep = "/"))
+    }
+
+if (length(gset) > 1) idx <- grep("GPL5188", attr(gset, "names")) else idx <- 1
+gset <- gset[[idx]]
+
+
+```
+
+### Información relevantes de los datos RNAseq
+
+#### Título
+```{r}
+pander(gset@experimentData@title)
+```
+
+#### Autores
+```{r}
+gset@experimentData@name
+```
+
+
+#### Resumen
+```{r}
+pander(gset@experimentData@abstract)
+```
+
+#### Web de descarga
+```{r}
+gset@experimentData@url
+```
+#### Diseño experimental del RNA seq
+```{r}
+design.experimental<-gset@phenoData@data[["extract_protocol_ch1"]]
+d.exp<-design.experimental[1]
+
+print(as.character(design.experimental[1]))
+
+```
+
+
+# Estructurar RNAseq 
+
+## Target
+
+El target es una tabla con información relevante de cada muestra para nuestro experimento, en este caso:
+
+- Código Gene Expresion
+- Grupo de pacientes
+- Grupo dicotómico nsclc y el resto, éste se debe crear ya que no se encuentra entre los datos.
+
+
+
+```{r, include=FALSE}
+variable.interes<-factor(gset@phenoData@data[["disease:ch1"]])
+summary(variable.interes)
+```
+
+
+
+```{r, include=FALSE}
+
+# Lo paso a caracteres
+grupo_cancer<-as.character(variable.interes)
+# Itinerador
+recuento=0
+v.interes<-"NSCLC"
+
+for (i in variable.interes) {recuento = recuento+1
+  if (i == v.interes){
+    grupo_cancer[recuento]= v.interes
+    
+  } else {
+grupo_cancer[recuento]="Control"
+    
+}
+    
+}
+grupo_cancer<-factor(grupo_cancer)
+summary(grupo_cancer)
+ 
+```
+
+**Resumen de los datos clasificados.**
+
+```{r, include=FALSE}
+Tipo<-gset@phenoData@data[["type"]]
+Namecode<-gset@phenoData@data[["geo_accession"]]
+grupos<-variable.interes
+Grupo_dicotomico<-grupo_cancer
+
+
+target<-data.frame(Namecode,Tipo,grupos,Grupo_dicotomico)
+# objeto tabla
+write.table(target, file=file.path(dataDir, "targets.txt"), 
+             sep="\t", row.names=FALSE, quote=FALSE)
+pander(target)
+```
+
+```{r}
+summary(target)
+```
+
+
+
+
+
+## Ajustes de los datos
+
+### Formato, objeto DGEList (edgeR)
+
+Se trabajará con paquete edgeR, el cual es un paquete escrito para R que realiza expresión diferencial genética utilizando datos de conteos bajo un modelo binomial negativo. Cada paquete tiene sus propias clases o condiciones para poder trabajar con él, este paquete necesita la clase DGEList para poder realizar cualquier análisis,el cual almacena la matriz de conteos y un data.frame con información de cada paciente, principalmente sobre la condición (cáncer-no cancer) a la que pertenece y el nivel de expresión. 
+
+```{r, include=FALSE}
+if (length(gse) > length(grupo_cancer)){
+    row.names(gse)<-gse[,1]
+    gse=gse[,-1]
+    
+  }
+
+dge=DGEList(gse,group=grupo_cancer,remove.zeros=TRUE)
+```
+
+### Eliminar ruido de fondo
+
+Es muy importante, antes de comenzar con el análisis diferencial de los genes,
+eliminar aquellos que no tienen conteos, o que apenas tienen. Pues de antemano
+se sabe que estos genes no se van a expresar de forma distinta en las diferentes
+condiciones que se estén estudiando.
+
+```{r, include=FALSE}
+# descarto los genes con baja expresion (filtro)
+keep <- rowSums(cpm(dge)>1) >= 2
+filtrado <- dge[keep, , keep.lib.sizes=FALSE]
+head(dge$samples)
+
+```
+
+### Normalización 
+
+función calcNormFactors()' del paquete 'edgeR'
+
+Además, previamente al análisis, se deben de normalizar los datos, sin embargo en este contexto normalizar tiene un significado distinto al que es usual en estadítica. En RNA Seq con la normalización se busca minimizar el ruido técnico introducido en los datos durante el proceso de secuenciación con el fin de volverlos comparables entre si, no se pretende transformarlos para que sigan una distribución normal, que es lo que se suele entender como normalización en términos estadísticos. El cálculo de dichos factores de normalización se realiza por la media truncada de los valores M (trimmed mean of M values, TMM) entre cada par de pacientes. Obtenemos factores de normalización cercanos a 1, lo cual nos indica que no existen grandes diferencias entre la composición de los distintos pacientes. 
+
+
+
+
+```{r, include=FALSE}
+filtrado <- calcNormFactors(filtrado)
+```
+```{r, include=FALSE}
+d_nor_filt<-filtrado
+```
+
+# Visualización gráfica de los datos de expresión génica
+
+
+
+## Boxplot
+
+
+```{r, include=FALSE}
+siglas_pacientes<-variable.interes
+grupos_cancer<-grupo_cancer
+```
+
+
+
+```{r, include=FALSE}
+logcpm<-log(cpm(filtrado)+1)
+
+siglas_pacientes<-factor(siglas_pacientes)
+
+union <- factor(paste(substr(grupos_cancer,1,5),siglas_pacientes,sep="."))
+colnames(logcpm)<-union
+
+
+meltcpm <- melt(logcpm, na.rm = FALSE, as.is = FALSE, value.name = "expresion")
+
+meltcpm = data.frame(meltcpm[,2:3], cell_line =substr(meltcpm$Var2, 1,5))
+str(meltcpm)
+str(df)
+
+```
+
+Boxplot del logaritmo de la expresión de los genes en cada grupo
+```{r}
+ggplot(meltcpm, aes(x = Var2, y = expresion, fill = cell_line)) + geom_boxplot() + xlab("") + ylab(expression(log[2](count + 1))) +
+  ggtitle ("Boxplot GSE89843") +
+  labs(x = "grupos",y = "Nivel de expresión")+
+coord_flip() + scale_fill_manual(values = c("#619CFF", "#F564E3"))
+
+```
+
+Se obserba una distribución anómala en el grupo "noncancer"
+
+## Histograma
+
+```{r}
+ggplot(meltcpm, aes(x = expresion, colour = Var2, fill = Var2))  +
+  theme (text = element_text(size=7))+
+  geom_density(alpha = 0.2, size = 1.25) + facet_wrap(~ cell_line) +
+  labs(x = "Nivel de expresión",y = "Densidad de genes")+
+  theme(legend.position = "top") + xlab(expression(log[2](count + 1)))
+```
+Se obserba una distribución anómala en el grupo "noncancer" el resto del dataset sigue una distribunión normal con un pico en los gones que no se expresan o se expresan muy poco, llama la atención que el grupo de sanos tiene un nivel de expresión, en general, mas bajo que el resto de pacientes.
+
+
+
+```{r colores, include=FALSE}
+recuento=0
+colores<-variable.interes
+colores<-as.character(colores)
+for (i in grupos) {recuento = recuento+1
+  if (i == "NSCLC"){
+    colores[recuento]= "blue"
+    #print("cancer")
+    
+  } else {
+colores[recuento]="red"
+    #print(grupo_cancer[recuento])
+}
+    
+}
+```
+
+
+# Identificación de genes diferencialmente expresados en cáncer-no cancer
+
+## Diseño experimental
+
+Hay que diferenciar entre el diseño experimental del experimento del que se obtiene base de datos, descrita en el apartado 2.2.3.4, y el diseño experimental propio de nuestro esperimento, con los datos de expresión génica que se han descrito, se pretende crear un algoritmo para clasificarlos en dos grupos, "cancer-no cancer", considerando cancer al grupo NSCLC y no cancer al resto, tanto sanos como las otras patologías presentaes en la base de datos. 
+
+### Contraste de hipótesis.
+
+Hipótesis nula (H=0) las expresiones son iguales en ambos grupos
+Hipótesis alternativa (H=1) las expresiones difieren en ambos grupos
+
+### Estimación de la dispersión
+
+Usando la variable de agrupación que hemos creamos(cáncer-no cancer). debemos estimar las dispersiones de cada gen con la función estimateDisp {edgeR}, necesario para poder usar la medida de variabilidad en las siguientes pruebas pruebas.
+
+
+Descripción de la Funcion estimateDisp {edgeR}:
+
+
+Estima las dispersiones binomiales negativas comunes, con tendencia y marcadas según las probabilidades empiricas de Bayes, El cual, maximiza la probabilidad binomial negativa para dar la estimación de las dispersiones comunes.
+
+```{r, include=FALSE}
+dge <- estimateDisp(d_nor_filt)
+summary(dge)
+```
+
+
+
+
+### Cálculo de expresión diferencial
+
+Función exactTest {edgeR}
+
+
+ Calcula las diferencias en las medias entre dos grupos de conteos de expresión
+```{r, include=FALSE}
+et <- exactTest(dge)
+class(et)
+summary(et)
+print(et$comparison)
+```
+
+
+### Genes infra y sobre expresados, input cutoff
+
+
+Se procede a clasificar los genes diferencialmente expresados atendiendo a los siguentes criterios:
+
+- El p-valor ajustado, éste se debe ajustar según el nivel de significación que se crea oportuno, en este caso 0.00000005. es decir, cutoff=5e+06.
+
+- El log fold change, en el que cada unidad corresponde a un cambio del 100% del nivel de expresión.
+
+- Y el logaritmo en base 2 de la media de los cpm (conteos por millon) de cada gen (logCPM)
+
+Estos Tests estadisticos se realizan con la funcion decideTests {edgeR}.
+
+```{r}
+cutoff=p=0.00000005
+
+de = decideTestsDGE(et, p = cutoff, adjust = "BH")
+summary(de)
+```
+Se observa los genes infra expresados (Down) y sobre expresados (Up) bajo la condición NSCLC
+
+## Gáficos del contraste
+
+
+### plotSmear {edgeR}
+
+```{r}
+detags = rownames(et)[as.logical(de)]
+plotSmear(et, de.tags = detags)
+abline(h = c(-0.5, 0.5), col = "blue")
+```
+
+Cada gen está representado por un punto, en el eje Y se observan los distintos logFC en relación con el logCPM en el eje x, resaltando en color rojo aquellos tránscritos considerados diferencialmente expresados, las líneas azules indican el logFC 0,5. Dicho logFC respresenta un cambio en la proporción de reads entre condiciones (nsclc-no cancer) equivalente a 5, es decir, el tránscrito al que le corresponde dicho logFC se expresa 5 veces más en una de las dos condiciones.
+
+
+### Gráfico volcano
+
+```{r}
+tab = data.frame(logFC = et$table[, 1], negLogPval = -log10(et$table[, 3]))
+row.names(tab)<-row.names(et$table)
+par(mar = c(5, 4, 4, 4))
+plot(tab, pch = 16, cex = 0.6, xlab = expression(log[2]~fold~change),
+ylab = expression(-log[10]~pvalue))
+## Log2 fold change and p-value cutoffs
+lfc = 1
+pval = cutoff
+## Selecting interest genes
+signGenes = (abs(tab$logFC) > lfc & tab$negLogPval > -log10(pval))
+## Identifying the selected genes
+points(tab[signGenes, ], pch = 16, cex = 0.8, col = "red")
+abline(h = -log10(pval), col = "green3", lty = 2)
+abline(v = c(-lfc, lfc), col = "blue", lty = 2)
+mtext(paste("pval =", pval), side = 4, at = -log10(pval), cex = 0.8, line = 0.5, las = 1)
+mtext(c(paste("-", lfc, "fold"), paste("+", lfc, "fold")), side = 3, at = c(-lfc, lfc),
+cex = 0.8, line = 0.5)
+```
+El eje X informa sobre el log fold-change de cada gen, y el eje Y mide el menos logaritmo en base 10 del p-valor asociado a cada gen. Únicamente los genes cuyo log fold-change es mayor que el umbral fijado (> 1), sufren un cambio de expresión significativo y están activados(puntos rojos del lado izquierdo); si el fold-change del gen es menor que el valor negativo del umbral fijado (< -1), el cambio es significativo y el gen está inhibido (puntos rojos en el lado izquierdo). Por otro lado, también es necesario aplicar la restricción que impone el p-valor. El cambio en expresión de un gen únicamente será significativo si el p-valor de este gen se sitúa por encima del p-valor umbral fijado anteriormente .
+
+# Machine learning
+En esta sección se pretende detectar la condición de cáncer de pulmón (NSCLC) a través de la expresión génica en los diferentes grupos de pacientes, no solo en pacientes con cáncer de pulmón y sanos, sino también el los grupos de pacientes con otras patologias, además se calcula el porcentaje de acierto en los diferentes grupos.
+
+
+## Implementación del Cross Validation
+
+Para aplicar la Validación Cruzada vamos a hacer uso de la función createFolds del paquete caret, y luego entrenaremos cada modelo sobre k = 5 subconjuntos. 
+
+
+```{r, include=FALSE}
+set.seed(234567)
+folds <- createFolds(grupo_cancer, k = 5)
+```
+
+
+
+
+## Feature selection 1 (FS1)
+
+
+Anteriormente se ha hecho un test estadistico con la funcion decideTests de edgeR el cual da como resultado una lista de los genes diferencialmente expresados bajo la condicion nsclc y el resto del dataset.
+
+En este apartado se crea una subparticiones con diferentes numeros de genes con mayor diferencia de expesion según el paquete edgeR, esta selección la llamaré FS1, nº de genes=(25,30,35,40,45,50,55,100)
+
+Posteriormente se hará una segunda selección de caracteristicas (Fs2) donde se seleccionará los genes con mayor importancia en la clasificación, según el accuracy.
+
+```{r, include=FALSE}
+tops<-list()
+genestop<-list()
+n_genes<-c(5,10,15,20,30,40,50,100,150)
+
+
+for (i in 1:length(n_genes)) {
+tops[[i]] <-topTags(et,n=n_genes[i])
+
+}
+
+
+for (i in 1:length(tops)) {
+ genestop[[i]]<-row.names(tops[[i]]$table)
+    
+}
+
+```
+
+
+```{r, include=FALSE}
+include_genestop<-list()
+for (i in 1:length(tops)) {
+ include_genestop[[i]]<-subset(gse, rownames(gse) %in% genestop[[i]])
+}
+```
+
+
+
+```{r, include=FALSE}
+newdata_include_genestop<-list()
+tinclude_genestop<-list()
+tinclude_genesdatostop<-list()
+
+
+for (i in 1:length(tops)) {
+ 
+ tinclude_genestop[[i]]<-t(include_genestop[[i]])
+ 
+ tinclude_genesdatostop[[i]]<-data.frame(tinclude_genestop[[i]],grupo_cancer,variable.interes)
+ #print(dim(tinclude_genesdatostop[[i]]))
+ 
+newdata_include_genestop[[i]] <-data.frame(tinclude_genestop[[i]],grupo_cancer)
+  
+#  tinclude_genesdatostop[[i]][,-length(tinclude_genesdatostop[[i]])]
+ 
+ #print(dim(tinclude_genesdatostop[[i]][,-length(tinclude_genesdatostop[[i]])]))
+}
+
+```
+
+
+### Random forest
+
+El clasificador elegido es el llamado random forest ya que estudios anteriores han demostrado buenos resultados 
+
+
+```{r, include=FALSE}
+set.seed(234567)
+
+contador1<-0
+
+t_pred<-list()
+
+
+
+for (i in newdata_include_genestop[1:length(newdata_include_genestop)]) {
+  contador1<-contador1+1
+
+  j<-tinclude_genesdatostop[[contador1]]
+  
+  
+  
+  tabla_predicion <- lapply(folds, function(x){
+
+  training_fold <- i[-x, ]
+  
+
+  test_fold <- i[x, ]
+  
+  subgruposcondicion<-j[x, ]$variable.interes
+  
+  
+  clasificador <- randomForest(grupo_cancer ~ ., data = training_fold, ntree = 250)
+  
+  y_pred <- predict(clasificador, newdata = test_fold,type="prob")
+  
+  pred <- predict(clasificador, newdata = test_fold)
+  
+  e<-data.frame(test_fold$grupo_cancer,y_pred[,2],pred,subgruposcondicion)
+  
+  return(e)
+
+  })
+  t_pred[[contador1]] <- do.call(rbind.data.frame, tabla_predicion)
+  
+  }
+  
+  
+``` 
+
+
+### Matriz de confusión
+
+ 
+```{r, include=FALSE}
+ee<-lapply(t_pred, function(x){
+ 
+  
+  matriz_confusion<-(confusionMatrix(x[,1], x[,3]))
+  return(matriz_confusion)
+
+})
+
+
+```
+
+```{r}
+
+for (i in 1:length(n_genes)) {
+ #plot(ee[[i]], main=sprintf(" %s %s",n_genes[i],"genes"), colorize=F)
+  
+  print(sprintf(" %s %s",n_genes[i],"genes"))
+  print(ee[[i]]$table)
+  
+}
+
+``` 
+
+### Accuracy
+
+```{r, include=FALSE}
+set.seed(234567)
+Predicciones <- matrix(NA, length(folds), length(tops))
+
+contador1<-0
+contador2<-0
+impgenes<-list()
+for (i in folds[1:length(folds)]) {
+  contador1<-contador1+1
+  contador2<-0
+  mc<-matrix(0, 2, 2)
+  
+  tabla_pred<-list()
+  
+  for (j in 1:length(tops)) {
+    contador2<-contador2+1
+    training_fold <- newdata_include_genestop[[j]][-i, ]
+  
+    test_fold <- newdata_include_genestop[[j]][i, ]
+
+    clasificador <- randomForest(grupo_cancer ~ ., data = training_fold,importance = TRUE, ntree = 250)
+    
+    y_pred <- predict(clasificador, newdata = test_fold)
+    
+    cm <- table(test_fold$grupo_cancer, y_pred)
+    
+    prec<-(cm[1,1] + cm[2,2]) / (cm[1,1] + cm[2,2] +cm[1,2] + cm[2,1])
+    
+    
+    Predicciones[contador1, contador2]<-prec
+    
+  }
+  
+}
+
+colnames(Predicciones)<-sprintf(" %s %s",n_genes,"genes")
+row.names(Predicciones)<-names(folds)
+
+```
+Al hacer cross validation con 5 subparticiones o folds se genera 5 accuracy por cada experimento, a continuacion se muestra las medias de cada folds
+```{r}
+print(colMeans(Predicciones))
+```
+
+A continuación se muestra los accuracy de cada experimento
+```{r}
+pander(Predicciones)
+
+
+
+```
+
+Boxplot accuracy
+```{r}
+boxplot(Predicciones, main = "Boxplot 5 folds RF", xlab = "Nº genes", ylab = "Accuracy",col="red")
+```
+Se observa una media del accuracy proximo al 84% a partir de 50 genes.
+### Curva ROC
+
+```{r, include=FALSE}
+ee<-lapply(t_pred, function(x){
+ 
+  forestpred = prediction(x[,2], x[,1])
+  forestperf = performance(forestpred, "auc")
+  return(forestperf)
+
+})
+
+
+```
+
+```{r}
+for (i in 1:length(n_genes)) {
+ 
+  aucs <- (ee[[i]]@y.values)
+  print(sprintf("AUC %s %s %s",n_genes[i],"genes",aucs))
+  
+}
+``` 
+
+```{r, include=FALSE}
+
+
+eee<-lapply(t_pred, function(x){
+ 
+  forestpred = prediction(x[,2], x[,1])
+  forestperf = performance(forestpred, "tpr", "fpr")
+  return(forestperf)
+
+})
+
+
+```
+ 
+```{r}
+par(mfrow=c(3,3))
+for (i in 1:length(n_genes)) {
+ plot(eee[[i]], main=sprintf(" %s %s",n_genes[i],"genes"), colorize=F)
+  
+  aucs<-round(as.numeric(ee[[i]]@y.values),3)
+  legend(x = "bottomright", legend = sprintf(" %s %s","AUC=",aucs))
+}
+
+```
+
+### AUC
+
+```{r, include=FALSE}
+ee<-lapply(t_pred, function(x){
+ 
+  forestpred = prediction(x[,2], x[,1])
+  forestperf = performance(forestpred, "auc")
+  return(forestperf)
+
+})
+
+
+```
+
+```{r}
+for (i in 1:length(n_genes)) {
+ 
+  aucs <- (ee[[i]]@y.values)
+  print(sprintf("AUC %s %s %s",n_genes[i],"genes",aucs))
+  
+}
+``` 
+
+
+
+
+
+
+## Feature selection según accuracy (Fs2).
+
+En esta segunda selección de genes utilizo el accuracy o importancia de los genes seleccionados con edgeR (150genes) en la clasificacion anterior (random forest) para selecionar los mismos números de genes vistos en la sección anterior.
+
+
+
+
+```{r, include=FALSE}
+impgenes<-list()
+for (j in 1:length(tops)) {
+  #print(dim(newdata_include_genestop[[j]]))
+  clasificador <- randomForest(grupo_cancer ~ ., data = newdata_include_genestop[[j]],importance = TRUE, ntree = 250)
+    impgenes[[j]]<-clasificador$importance
+  
+}
+
+```
+
+
+
+```{r, include=FALSE}
+importancia <-lapply(impgenes,function(x){
+  
+  
+  feat_importance <- as.data.frame(x)
+feat_importance <- tibble::rownames_to_column(feat_importance,var = "variable")
+
+p1 <- ggplot(data = feat_importance, aes(x = reorder(variable, MeanDecreaseAccuracy),
+                               y = MeanDecreaseAccuracy,
+                               fill = MeanDecreaseAccuracy)) +
+      labs(x = "variable", title = "Accuracy Reduction") +
+      geom_col() +
+      coord_flip() +
+      theme_bw() +
+      theme(legend.position = "bottom")
+
+p2 <- ggplot(data = feat_importance, aes(x = reorder(variable, MeanDecreaseGini),
+                               y = MeanDecreaseGini,
+                               fill = MeanDecreaseGini)) +
+      labs(x = "variable", title = "Purity Reduction (Gini)") +
+      geom_col() +
+      coord_flip() +
+      theme_bw() +
+      theme(legend.position = "bottom")
+print(ggarrange(p1, p2))
+  
+  return(feat_importance)
+})
+  
+
+
+```
+
+```{r, include=FALSE}
+
+
+x<-importancia[[length(n_genes)]]
+x<-x [rev(order(x$MeanDecreaseAccuracy)), ]
+
+rankImportance<-list()
+
+for (i in 1:length(n_genes)) {
+ 
+ rankImportance [[i]]<-x$variable[1:n_genes[i]] 
+}
+
+sc2<-rankImportance
+
+```
+
+
+
+```{r, include=FALSE}
+selec_genes<-list()
+for (i in 1:length(sc2)) {
+x<-sc2
+
+
+selec_genes[[i]] <-subset(gse, rownames(gse) %in% x[[i]])
+}
+sg2<-selec_genes
+```
+
+
+```{r, include=FALSE}
+tinclude_genes2<-sg2
+tinclude_genesdatos2<-sg2
+newdata_include_genes2<-sg2
+
+for (i in 1:length(tinclude_genes2)) {
+  
+    tinclude_genes2[[i]]<-data.frame(t(tinclude_genes2[[i]]))
+    tinclude_genesdatos2[[i]]<-data.frame(tinclude_genes2[[i]],grupo_cancer,variable.interes)
+    newdata_include_genes2[[i]] <- data.frame(tinclude_genes2[[i]],grupo_cancer)
+  }
+  
+
+
+```
+
+
+
+### Random forest fs2
+
+Se usa de nuevo el algoritmo random forest para clasificar nsclc con los genes seleccionados
+
+```{r, include=FALSE}
+set.seed(234567)
+
+contador1<-0
+
+t_pred<-newdata_include_genes2
+
+
+
+
+for (i in 1:length(newdata_include_genes2)) {
+  
+  contador1<-contador1+1
+ 
+    
+  
+    
+     z<-newdata_include_genes2[[contador1]]
+     y<-tinclude_genesdatos2[[contador1]]
+     #print(z)
+     
+     
+     
+     
+     tabla_predicion <- lapply(folds, function(x){
+       
+       
+       training_fold <- z[-x, ]
+       test_fold <- z[x, ]
+       subgruposcondicion<-y[x, ]$variable.interes
+       
+
+       
+       clasificador <- randomForest(grupo_cancer ~ ., data = training_fold, ntree = 250, importancia=TRUE)
+       y_pred <- predict(clasificador, newdata = test_fold,type="prob")
+       pred <- predict(clasificador, newdata = test_fold)
+       e<-data.frame(test_fold$grupo_cancer,y_pred[,2],pred,subgruposcondicion)
+       
+      
+       
+      
+       prec<-(cm[1,1] + cm[2,2]) / (cm[1,1] + cm[2,2] +cm[1,2] + cm[2,1])
+       
+       
+       
+       return(e)
+
+     })
+     
+     t_pred[[contador1]] <- do.call(rbind.data.frame, tabla_predicion)
+
+    
+  }
+ 
+
+  
+```  
+
+
+### Accuracy fs2
+
+```{r, include=FALSE}
+aciertos<-list()
+ee<-lapply(t_pred, function(x){
+ 
+  
+  matriz_confusion<-(confusionMatrix(x[,1], x[,3]))
+  mconfusion<-(matriz_confusion$overall['Accuracy'])
+  return(mconfusion)
+
+})
+aciertos<-ee
+```
+
+```{r}
+accuracys<-as.data.frame(aciertos)
+colnames(accuracys)<-sprintf(" %s %s",n_genes,"genes")
+print(accuracys)
+```
+
+
+
+
+```{r, include=FALSE}
+set.seed(234567)
+Predicciones2 <- matrix(NA, length(folds), length(tops))
+
+contador1<-0
+contador2<-0
+#impgenes<-list()
+for (i in folds[1:length(folds)]) {
+  contador1<-contador1+1
+  contador2<-0
+  mc<-matrix(0, 2, 2)
+  
+  tabla_pred<-list()
+  
+  for (j in 1:length(tops)) {
+    contador2<-contador2+1
+    training_fold <- newdata_include_genes2[[j]][-i, ]
+  
+    test_fold <- newdata_include_genes2[[j]][i, ]
+
+    clasificador <- randomForest(grupo_cancer ~ ., data = training_fold,importance = TRUE, ntree = 250)
+    
+    y_pred <- predict(clasificador, newdata = test_fold)
+    
+    cm <- table(test_fold$grupo_cancer, y_pred)
+    
+    prec<-(cm[1,1] + cm[2,2]) / (cm[1,1] + cm[2,2] +cm[1,2] + cm[2,1])
+    
+    
+    Predicciones2[contador1, contador2]<-prec
+    
+  }
+  
+}
+
+colnames(Predicciones2)<-sprintf(" %s %s",n_genes,"genes")
+row.names(Predicciones2)<-names(folds)
+
+``` 
+
+
+
+
+
+
+```{r, include=FALSE}
+color<-c("red","blue")
+colores<-rep(color,length(n_genes))
+print(colores)
+```
+
+```{r, include=FALSE}
+contador<-0
+n_genes2<-rep(n_genes,2)
+comparativa<-matrix(NA, length(folds), length(tops)*2)
+for (i in seq (1,length(tops)*2,2) ) {
+  contador<-contador+1
+  comparativa[,i]<-Predicciones[,contador]
+  comparativa[,i+1]<-Predicciones2[,contador]
+  
+  n_genes2[i]<-n_genes[contador]
+  n_genes2[i+1]<-n_genes[contador]
+  
+  
+}
+```
+
+
+```{r}
+colnames(comparativa)<-sprintf(" %s %s",n_genes2,"genes")
+boxplot(comparativa,col=colores, cex.axis=0.6,main = "Accuracy")
+legend(x = "bottomright", legend = c("Fs1", "Fs2"), fill = c("red", "blue"), 
+       title = "feature selection")
+```
+
+```{r}
+colMeans(Predicciones2)
+```
+
+
+
+```{r, include=FALSE}
+set.seed(234567)
+
+contador1<-0
+contador2<-0
+
+t_pred2<-list()
+
+
+
+
+for (i in 1:length(newdata_include_genes2)) {
+  
+  contador1<-contador1+1
+
+
+ 
+  
+
+    
+    
+     z<-newdata_include_genes2[[contador1]]
+     y<-tinclude_genesdatos2[[contador1]]
+     #print(z)
+     
+     
+     
+     
+     tabla_predicion <- lapply(folds, function(x){
+       
+       
+       training_fold <- z[-x, ]
+       test_fold <- z[x, ]
+       subgruposcondicion<-y[x, ]$variable.interes
+       
+
+       
+       clasificador <- randomForest(grupo_cancer ~ ., data = training_fold, ntree = 250)
+       y_pred <- predict(clasificador, newdata = test_fold,type="prob")
+       pred <- predict(clasificador, newdata = test_fold)
+       e<-data.frame(test_fold$grupo_cancer,y_pred[,2],pred,subgruposcondicion)
+       
+       
+       cm <- table(test_fold$grupo_cancer, pred)
+       
+      
+       prec<-(cm[1,1] + cm[2,2]) / (cm[1,1] + cm[2,2] +cm[1,2] + cm[2,1])
+       
+       
+       
+       return(e)
+
+     })
+     #print(tabla_predicion)
+     #cm[[j]]<-tabla_pred
+     t_pred2[[contador1]] <- do.call(rbind.data.frame, tabla_predicion)
+
+    
+  }
+  #aciertos[[i]]<-cm
+
+ 
+``` 
+
+ 
+
+
+
+### Curva ROC y AUC fs2
+
+```{r, include=FALSE}
+aucss<-lapply(t_pred2, function(x){
+ 
+  forestpred = prediction(x[,2], x[,1])
+  forestperf = performance(forestpred, "auc")
+  return(forestperf)
+
+})
+
+
+```
+
+```{r, include=FALSE}
+
+
+
+
+  ee<-lapply(t_pred2, function(x){
+ 
+  
+  forestpred = prediction(x[,2], x[,1])
+   forestperf = performance(forestpred, "tpr", "fpr")
+  return(forestperf)
+
+})
+
+
+
+
+
+```
+ 
+```{r}
+par(mfrow=c(3,3))
+for (i in 1:length(n_genes)) {
+  aucs <- (aucss[[i]]@y.values)
+  aucs<-as.numeric(aucs)
+  aucs<-round(aucs,3) 
+   plot(ee[[i]], main=sprintf(" %s %s",n_genes[i],"genes"), colorize=F) 
+  legend(x = "bottomright", legend = sprintf(" %s %s","AUC=",aucs))
+  }
+ 
+
+
+```
+
+
+
+
+
+## Feature selection boruta (Fs3)
+
+Se hace una nueva selección de genes con mas importancia ahora con la funcion boruta()
+
+```{r}
+#boruta.train <- Boruta(grupo_cancer~., data = newdata_include_genes2[[6]], doTrace = 2)
+
+boruta.train <- Boruta(grupo_cancer~., data = newdata_include_genestop[[length(n_genes)]] )
+#newdata_include_genestop[[j]] # los 150 genes
+```
+
+```{r}
+ plot(boruta.train, xlab = "", xaxt = "n")
+lz<-lapply(1:ncol(boruta.train$ImpHistory),function(i)
+boruta.train$ImpHistory[is.finite(boruta.train$ImpHistory[,i]),i])
+names(lz) <- colnames(boruta.train$ImpHistory)
+Labels <- sort(sapply(lz,median))
+axis(side = 1,las=2,labels = names(Labels),
+at = 1:ncol(boruta.train$ImpHistory), cex.axis = 0.7)
+```
+
+```{r}
+
+boruta_imp<-rev(sort(Labels)) 
+boruta_imp<-names(boruta_imp)
+```
+
+
+```{r, include=FALSE}
+
+
+
+x<-boruta_imp
+
+rankImportance<-list()
+
+for (i in 1:length(n_genes)) {
+ 
+ rankImportance [[i]]<-boruta_imp[1:n_genes[i]] 
+}
+
+sc3<-rankImportance
+
+```
+
+
+
+```{r, include=FALSE}
+selec_genes<-list()
+for (i in 1:length(sc3)) {
+x<-sc3
+
+
+selec_genes[[i]] <-subset(gse, rownames(gse) %in% x[[i]])
+}
+sg3<-selec_genes
+```
+
+
+```{r, include=FALSE}
+tinclude_genes3<-sg3
+tinclude_genesdatos3<-sg3
+newdata_include_genes3<-sg3
+
+for (i in 1:length(tinclude_genes3)) {
+  
+    tinclude_genes3[[i]]<-data.frame(t(tinclude_genes3[[i]]))
+    tinclude_genesdatos3[[i]]<-data.frame(tinclude_genes3[[i]],grupo_cancer,variable.interes)
+    newdata_include_genes3[[i]] <- data.frame(tinclude_genes3[[i]],grupo_cancer)
+  }
+  
+
+
+```
+
+
+
+
+
+### Random forest fs3
+
+Se utiliza de nuevo random fores para los genes con mas importancia escogidos con la función boruta
+
+```{r, include=FALSE}
+set.seed(234567)
+
+contador1<-0
+
+t_pred3<-newdata_include_genes3
+
+
+
+
+for (i in 1:length(newdata_include_genes3)) {
+  
+  contador1<-contador1+1
+ 
+    
+  
+    
+     z<-newdata_include_genes3[[contador1]]
+     y<-tinclude_genesdatos3[[contador1]]
+     #print(z)
+     
+     
+     
+     
+     tabla_predicion <- lapply(folds, function(x){
+       
+       
+       training_fold <- z[-x, ]
+       test_fold <- z[x, ]
+       subgruposcondicion<-y[x, ]$variable.interes
+       
+
+       
+       clasificador <- randomForest(grupo_cancer ~ ., data = training_fold, ntree = 250, importancia=TRUE)
+       y_pred <- predict(clasificador, newdata = test_fold,type="prob")
+       pred <- predict(clasificador, newdata = test_fold)
+       e<-data.frame(test_fold$grupo_cancer,y_pred[,2],pred,subgruposcondicion)
+       
+      
+       
+      
+       prec<-(cm[1,1] + cm[2,2]) / (cm[1,1] + cm[2,2] +cm[1,2] + cm[2,1])
+       
+       
+       
+       return(e)
+
+     })
+     
+     t_pred3[[contador1]] <- do.call(rbind.data.frame, tabla_predicion)
+
+    
+  }
+ 
+
+  
+```  
+
+
+
+
+
+
+### Accuracy fs3
+
+
+```{r, include=FALSE}
+aciertos<-list()
+ee<-lapply(t_pred3, function(x){
+ 
+  
+  matriz_confusion<-(confusionMatrix(x[,1], x[,3]))
+  mconfusion<-(matriz_confusion$overall['Accuracy'])
+  return(mconfusion)
+
+})
+aciertos<-ee
+```
+
+```{r}
+accuracys<-as.data.frame(aciertos)
+colnames(accuracys)<-sprintf(" %s %s",n_genes,"genes")
+pander(accuracys)
+```
+
+
+
+
+```{r, include=FALSE}
+set.seed(234567)
+Predicciones3 <- matrix(NA, length(folds), length(tops))
+
+contador1<-0
+contador2<-0
+#impgenes<-list()
+for (i in folds[1:length(folds)]) {
+  contador1<-contador1+1
+  contador2<-0
+  mc<-matrix(0, 2, 2)
+  
+  tabla_pred<-list()
+  
+  for (j in 1:length(tops)) {
+    contador2<-contador2+1
+    training_fold <- newdata_include_genes3[[j]][-i, ]
+  
+    test_fold <- newdata_include_genes3[[j]][i, ]
+
+    clasificador <- randomForest(grupo_cancer ~ ., data = training_fold,importance = TRUE, ntree = 250)
+    
+    y_pred <- predict(clasificador, newdata = test_fold)
+    
+    cm <- table(test_fold$grupo_cancer, y_pred)
+    
+    prec<-(cm[1,1] + cm[2,2]) / (cm[1,1] + cm[2,2] +cm[1,2] + cm[2,1])
+    
+    
+    Predicciones3[contador1, contador2]<-prec
+    
+  }
+  
+}
+
+colnames(Predicciones3)<-sprintf(" %s %s",n_genes,"genes")
+row.names(Predicciones3)<-names(folds)
+
+``` 
+
+
+
+
+
+
+```{r, include=FALSE}
+color<-c("red","blue","yellow")
+colores<-rep(color,length(n_genes))
+print(colores)
+```
+
+```{r, include=FALSE}
+contador<-0
+n_genes2<-rep(n_genes,3)
+comparativa<-matrix(NA, length(folds), length(tops)*3)
+for (i in seq (1,length(tops)*3,3) ) {
+  contador<-contador+1
+  comparativa[,i]<-Predicciones[,contador]
+  comparativa[,i+1]<-Predicciones2[,contador]
+  comparativa[,i+2]<-Predicciones3[,contador]
+  
+  n_genes2[i]<-n_genes[contador]
+  n_genes2[i+1]<-n_genes[contador]
+  n_genes2[i+2]<-n_genes[contador]
+  
+  
+}
+```
+
+
+```{r}
+colnames(comparativa)<-sprintf(" %s %s",n_genes2,"genes")
+boxplot(comparativa,col=colores, cex.axis=0.6,main = "Accuracy")
+legend(x = "bottomright", legend = c("Fs1", "Fs2","Fs3"), fill = c("red", "blue","yellow"), 
+       title = "feature selection")
+```
+
+
+
+### Curva Roc y AUC fs2
+
+
+```{r, include=FALSE}
+aucss<-lapply(t_pred3, function(x){
+ 
+  forestpred = prediction(x[,2], x[,1])
+  forestperf = performance(forestpred, "auc")
+  return(forestperf)
+
+})
+
+
+```
+
+```{r, include=FALSE}
+
+
+
+
+  ee<-lapply(t_pred3, function(x){
+ 
+  
+  forestpred = prediction(x[,2], x[,1])
+   forestperf = performance(forestpred, "tpr", "fpr")
+  return(forestperf)
+
+})
+
+
+
+
+
+```
+ 
+```{r}
+par(mfrow=c(3,3))
+for (i in 1:length(n_genes)) {
+  aucs <- (aucss[[i]]@y.values)
+  aucs<-as.numeric(aucs)
+  aucs<-round(aucs,3) 
+   plot(ee[[i]], main=sprintf(" %s %s",n_genes[i],"genes"), colorize=F) 
+  legend(x = "bottomright", legend = sprintf(" %s %s","AUC=",aucs))
+  }
+ 
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r, include=FALSE}
+ee<-lapply(t_pred3, function(x){
+ 
+  forestpred = prediction(x[,2], x[,1])
+  forestperf = performance(forestpred, "auc")
+  return(forestperf)
+
+})
+
+
+```
+
+```{r}
+for (i in 1:length(n_genes)) {
+ 
+  aucs <- (ee[[i]]@y.values)
+  print(sprintf("AUC %s %s %s",n_genes[i],"genes",aucs))
+  
+}
+``` 
+
+
+## AUC grupos
+Los mejores resultados se han obtenido con 30 genes en fs2, a continuacion se muestra el rendimiento de la clasificacion en cada grupo de pacientes
+```{r}
+resumen_grupos<-summary(variable.interes)
+sumaroria_resum_g<-length(resumen_grupos)
+g<-names(resumen_grupos)
+#gg<-do.call(rbind.data.frame, grupo)
+fs_elegido<-t_pred3[[6]]
+print(n_genes[5])
+for (i in 1:length(g)) {
+
+gresult <- subset(fs_elegido, fs_elegido$subgruposcondicion %in% g[i])
+
+mc<- table(gresult$test_fold.grupo_cancer, gresult$pred)
+print(g[i])
+
+print(mc)
+
+prec <- (mc[1,1] + mc[2,2]) / (mc[1,1] + mc[2,2] +mc[1,2] + mc[2,1])
+
+
+print(sprintf("porcentaje de acierto en el grupo  %s %s %s %s",g[i],"es:",prec*100,"%"))
+
+
+ # forestpred = prediction(gresult[,2], gresult[,1])
+#  forestperf = performance(forestpred, "tpr", "fpr")
+  
+#  print(plot(forestperf, main="curva ROC", colorize=F))
+
+}
+```
+## Tabla informativa de genes seleccionados.
+
+```{r, include=FALSE}
+#genes<-importancia[[3]][rev(order(importancia[[3]]$MeanDecreaseAccuracy)), ]
+genes<-names(newdata_include_genes3[[3]])
+#genes<-genes$variable
+```
+
+
+
+
+
+```{r, include=FALSE}
+
+library(org.Hs.eg.db)
+keytypes(org.Hs.eg.db)
+```
+
+
+
+```{r, include=FALSE}
+## Build up the query step-by-step
+my.keys <- genes
+my.keys %in% keys(org.Hs.eg.db, keytype="ENSEMBL")
+```
+
+```{r}
+
+#columns(org.Hs.eg.db)
+
+ann <- select(org.Hs.eg.db, keytype="ENSEMBL", keys=genes,columns=c("SYMBOL","GENENAME"))
+#dif_expresion<-top[["table"]][["logFC"]]
+
+
+
+#duplicated(ann$ENSEMBL)
+#ann <- ann[!duplicated(ann$ENSEMBL), ]
+
+ann<-data.frame(ann)
+pander(ann)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
